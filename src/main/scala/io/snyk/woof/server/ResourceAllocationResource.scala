@@ -40,9 +40,9 @@ class ResourceAllocationResource {
     val memBefore = usedMemoryMB()
     val startTime = System.currentTimeMillis()
 
-    // Simulate an async operation
+
     val futureResult = Future {
-      Thread.sleep(1000) // Simulate some work
+
       "Resource loaded successfully"
     }
 
