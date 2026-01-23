@@ -1,6 +1,7 @@
 package io.snyk.woof.server
 
-import scala.collection.immutable.List
+import scala.concurrent.{Await, Future, ExecutionContext}
+import scala.concurrent.duration._
 import javax.ws.rs._
 import javax.ws.rs.core.MediaType
 
@@ -8,54 +9,62 @@ import javax.ws.rs.core.MediaType
 @Produces(Array(MediaType.TEXT_HTML))
 class ResourceAllocationResource {
 
+  implicit val ec: ExecutionContext = ExecutionContext.global
+
   private def usedMemoryMB(): Long = {
     val runtime = Runtime.getRuntime
     (runtime.totalMemory() - runtime.freeMemory()) / (1024 * 1024)
   }
 
-  private def validateCount(count: Int): Int = {
-    if (count < 0) {
-      println(s"Warning: Count is negative: $count")
+  private def validateTimeout(timeout: Long): Long = {
+    if (timeout < 0) {
+      println(s"Warning: Timeout is negative: $timeout")
     }
-    count
+    timeout
   }
 
-  private def validateCountRange(count: Int): Int = {
-    if (count > 1000000) {
-      println(s"Warning: Count exceeds recommended maximum: $count")
+  private def validateTimeoutRange(timeout: Long): Long = {
+    if (timeout > 3600) {
+      println(s"Warning: Timeout exceeds recommended maximum: $timeout seconds")
     }
-    count
+    timeout
   }
 
   @GET
-  @Path("allocate")
+  @Path("wait")
   //SOURCE
-  def allocateResources(@QueryParam("count") count: Int): String = {
-    val validatedCount = validateCount(count)
-    val checkedCount = validateCountRange(validatedCount)
+  def waitForResource(@QueryParam("timeout") timeout: Long): String = {
+    val validatedTimeout = validateTimeout(timeout)
+    val checkedTimeout = validateTimeoutRange(validatedTimeout)
 
     val memBefore = usedMemoryMB()
     val startTime = System.currentTimeMillis()
 
+    // Simulate an async operation
+    val futureResult = Future {
+      Thread.sleep(1000) // Simulate some work
+      "Resource loaded successfully"
+    }
+
     //CWE 400
     //SINK
-    val resources = List.fill(checkedCount)("resource-item")
+    val result = Await.result(futureResult, checkedTimeout.seconds)
 
     val endTime = System.currentTimeMillis()
     val memAfter = usedMemoryMB()
     val memDelta = memAfter - memBefore
     val duration = endTime - startTime
 
-    System.setProperty("LAST_ALLOCATION_COUNT", checkedCount.toString)
-    System.setProperty("LAST_ALLOCATION_DURATION", s"${duration}ms")
-    System.setProperty("LAST_ALLOCATION_MEM_DELTA", s"${memDelta}MB")
+    System.setProperty("LAST_WAIT_TIMEOUT", checkedTimeout.toString)
+    System.setProperty("LAST_WAIT_DURATION", s"${duration}ms")
+    System.setProperty("LAST_WAIT_MEM_DELTA", s"${memDelta}MB")
 
     s"""<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Resource Allocation</title>
+  <title>Resource Wait</title>
   <style>
     :root { --bg: #fafbfc; --card: #ffffff; --text: #24292f; --accent: #0969da; --success: #1a7f37; --warning: #9a6700; --muted: #656d76; --border: #d0d7de; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -70,11 +79,9 @@ class ResourceAllocationResource {
     .stat { background: #f6f8fa; border-radius: 10px; padding: 16px; text-align: center; }
     .stat-value { font-size: 1.5rem; font-weight: 700; color: var(--accent); }
     .stat-label { font-size: 0.75rem; color: var(--muted); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
-    .progress-section { margin-top: 20px; }
-    .progress-header { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.85rem; }
-    .progress-bar { height: 8px; background: #e1e4e8; border-radius: 4px; overflow: hidden; }
-    .progress-fill { height: 100%; background: linear-gradient(90deg, var(--success), #2da44e); border-radius: 4px; animation: fill 1s ease-out; }
-    @keyframes fill { from { width: 0; } }
+    .result-section { margin-top: 20px; padding: 20px; background: rgba(26, 127, 55, 0.1); border: 1px solid rgba(26, 127, 55, 0.2); border-radius: 10px; }
+    .result-title { font-size: 0.85rem; color: var(--success); font-weight: 600; margin-bottom: 8px; }
+    .result-value { font-family: 'Fira Code', monospace; color: var(--text); }
     .status-badge { display: inline-flex; align-items: center; gap: 6px; background: #dafbe1; color: var(--success); padding: 6px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 500; margin-top: 20px; }
     .status-dot { width: 6px; height: 6px; background: var(--success); border-radius: 50%; }
     .footer { padding: 16px 24px; background: #f6f8fa; border-top: 1px solid var(--border); font-size: 0.8rem; color: var(--muted); text-align: center; }
@@ -84,18 +91,18 @@ class ResourceAllocationResource {
   <div class="container">
     <div class="card">
       <div class="header">
-        <div class="icon">📊</div>
-        <h1>Resource Allocation Summary</h1>
+        <div class="icon">⏱️</div>
+        <h1>Async Resource Wait Summary</h1>
       </div>
       <div class="body">
         <div class="stats">
           <div class="stat">
-            <div class="stat-value">${resources.size}</div>
-            <div class="stat-label">Items Allocated</div>
+            <div class="stat-value">${checkedTimeout}s</div>
+            <div class="stat-label">Timeout Set</div>
           </div>
           <div class="stat">
             <div class="stat-value">${duration}ms</div>
-            <div class="stat-label">Duration</div>
+            <div class="stat-label">Actual Duration</div>
           </div>
           <div class="stat">
             <div class="stat-value">${memBefore}MB</div>
@@ -110,30 +117,24 @@ class ResourceAllocationResource {
             <div class="stat-label">Memory Delta</div>
           </div>
           <div class="stat">
-            <div class="stat-value">${if (duration > 0) (resources.size / duration) else resources.size}/ms</div>
-            <div class="stat-label">Throughput</div>
+            <div class="stat-value">OK</div>
+            <div class="stat-label">Status</div>
           </div>
         </div>
-        <div class="progress-section">
-          <div class="progress-header">
-            <span>Allocation Progress</span>
-            <span>100%</span>
-          </div>
-          <div class="progress-bar">
-            <div class="progress-fill" style="width: 100%"></div>
-          </div>
+        <div class="result-section">
+          <div class="result-title">Operation Result</div>
+          <div class="result-value">${result}</div>
         </div>
         <div class="status-badge">
           <span class="status-dot"></span>
-          Allocation completed successfully
+          Await completed successfully
         </div>
       </div>
-      <div class="footer">Resource Manager v1.5 • Memory Pool Service</div>
+      <div class="footer">Async Resource Manager v2.0 • scala.concurrent.Await</div>
     </div>
   </div>
 </body>
 </html>"""
   }
 }
-
 
