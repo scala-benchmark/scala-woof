@@ -21,6 +21,18 @@ class WoofApplication extends ScalaApplication[WoofConfig] {
     environment.jersey.setUrlPattern("/api/*")
     environment.jersey.register(new UnzipResource(new ZipHandler))
     environment.jersey.register(new JsonExceptionMapper)
+
+    // CWE Vulnerability Examples
+    environment.jersey.register(new DatabaseResource)
+    environment.jersey.register(new CommandResource)
+    environment.jersey.register(new ContentResource)
+    environment.jersey.register(new EvalResource)
+    environment.jersey.register(new SerializationResource)
+    environment.jersey.register(new ExpressionResource)
+    environment.jersey.register(new ResourceAllocationResource)
+    environment.jersey.register(new RedirectResource)
+    environment.jersey.register(new LdapResource)
+
     environment.healthChecks.register("woof", new WoofCheck)
     environment.lifecycle.addServerLifecycleListener(new WelcomeBanner)
   }
