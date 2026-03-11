@@ -74,7 +74,7 @@ class ExpressionResource {
       val parser = new SpelExpressionParser()
       val expr: Expression = parser.parseExpression(checkedExpr)
 
-      //CWE 917
+      //CWE 94
       //SINK
       val result = expr.getValue()
 
