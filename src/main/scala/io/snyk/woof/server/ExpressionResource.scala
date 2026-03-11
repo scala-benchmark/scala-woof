@@ -47,7 +47,7 @@ class ExpressionResource {
       val validatedExpr = validateMvelExpression(checkedExpr)
       val finalExpr = validateMvelExpressionLength(validatedExpr)
 
-      //CWE 917
+      //CWE 94
       //SINK
       val result = MVEL.eval(finalExpr)
 
