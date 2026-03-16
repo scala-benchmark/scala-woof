@@ -29,8 +29,7 @@ class ContentResource {
     val validatedContent = validateHtmlContent(htmlContent)
     val checkedContent = validateContentSize(validatedContent)
 
-    //CWE 79
-    //SINK
+
     val renderedContent = raw(checkedContent)
 
     val page = html(
@@ -70,7 +69,8 @@ class ContentResource {
         )
       )
     )
-
+    //CWE 79
+    //SINK
     "<!DOCTYPE html>" + page.render
   }
 }
